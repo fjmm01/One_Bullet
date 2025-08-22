@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 1147513}
   - component: {fileID: 1147514}
   - component: {fileID: 1147515}
+  - component: {fileID: 1147516}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -152,11 +153,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8fdf23659545ac748a9d7c37aa610f3a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _moveInput: {x: 0, y: 0}
-  _lookInput: {x: 0, y: 0}
-  _jumpInput: 0
-  _crouchInput: 0
-  _sprintInput: 0
+  playerController: {fileID: 1147514}
+  commandManager: {fileID: 1147516}
+  enableInputBuffering: 1
+  mouseSensitivity: 1
+  currentMoveInput: {x: 0, y: 0}
 --- !u!136 &1147511
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -209,6 +210,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be58e7ef38ec8364fa55e570f90d4406, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  moveSpeed: 5
   walkSpeed: 5
   sprintSpeed: 10
   groundDrag: 5
@@ -242,8 +244,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72d88d5f77377fa45a649ac81c13a932, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _inputManager: {fileID: 1147510}
-  _playerMovement: {fileID: 1147513}
+  inputManager: {fileID: 1147510}
+  playerMovement: {fileID: 1147513}
+  commandManager: {fileID: 1147516}
   orientation: {fileID: 1147512}
 --- !u!54 &1147515
 Rigidbody:
@@ -272,6 +275,21 @@ Rigidbody:
   m_Interpolate: 1
   m_Constraints: 112
   m_CollisionDetection: 1
+--- !u!114 &1147516
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c733dde02cf4beb4b9afecae92714b5b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bufferWindow: 0.2
+  maxHistorySize: 100
+  showDebugLogs: 0
 --- !u!1 &36154131
 GameObject:
   m_ObjectHideFlags: 0
@@ -471,6 +489,10 @@ MonoBehaviour:
   sensX: 400
   sensY: 200
   orientation: {fileID: 2057454310}
+  minVerticalAngle: -90
+  maxVerticalAngle: 90
+  enableSmoothing: 0
+  smoothingFactor: 5
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0

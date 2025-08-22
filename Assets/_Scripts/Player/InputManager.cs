@@ -12,7 +12,7 @@ public class InputManager : MonoBehaviour
     [SerializeField] private float mouseSensitivity = 1.0f;
 
     private PlayerControls playerControls;
-    private Vector2 currentMoveInput;
+    [SerializeField]private Vector2 currentMoveInput;
     private Vector2 currentLookInput;
 
     private void Awake()

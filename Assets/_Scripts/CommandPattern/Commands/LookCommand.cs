@@ -12,7 +12,7 @@ public class LookCommand : MovementCommand
 
     public override void Execute()
     {
-        var cameraController = playerController?.GetComponentInChildren<FPSCameraController>();
+        var cameraController = GameObject.FindFirstObjectByType<FPSCameraController>();
         if (cameraController)
         {
             //Store look input for camera controller to use

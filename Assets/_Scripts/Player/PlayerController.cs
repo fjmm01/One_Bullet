@@ -1,114 +1,271 @@
 using System;
 using UnityEngine;
 
+/// <summary>
+/// Updated Player Controller that works with Command Pattern input system
+/// </summary>
 public class PlayerController : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private InputManager _inputManager;
-    [SerializeField] private PlayerMovement _playerMovement;
+    [SerializeField] private InputManager inputManager;
+    [SerializeField] private PlayerMovement playerMovement;
+    [SerializeField] private CommandManager commandManager;
     public Transform orientation;
 
     public static MovementState CurrentState;
 
-    #region Flags
-    bool _jumpFlag;
-    bool _crouchFlag;
-    bool _sprintFlag;
+    #region Input Flags
+    private bool jumpFlag;
+    private bool crouchFlag;
+    private bool sprintFlag;
+    #endregion
+
+    #region Properties
+    public PlayerMovement PlayerMovement => playerMovement;
+    public CommandManager CommandManager => commandManager;
+    public bool IsJumping => jumpFlag;
+    public bool IsCrouching => crouchFlag;
+    public bool IsSprinting => sprintFlag;
     #endregion
 
     private void Awake()
     {
-        _playerMovement = GetComponent<PlayerMovement>();
-        _inputManager = GetComponent<InputManager>();
+        InitializeComponents();
         CurrentState = MovementState.Walking;
     }
 
     private void Update()
     {
-        HandleInputs();
         HandleMovementInputs();
         HandleMovementState();
+
+        // Try to consume buffered jump input if we can jump
+        TryConsumeBufferedJump();
+    }
+
+    private void InitializeComponents()
+    {
+        // Get component references
+        if (!playerMovement) playerMovement = GetComponent<PlayerMovement>();
+        if (!inputManager) inputManager = GetComponent<InputManager>();
+        if (!commandManager) commandManager = GetComponent<CommandManager>();
+
+        // Validate critical components
+        if (!playerMovement)
+        {
+            Debug.LogError("PlayerController: PlayerMovement component not found!");
+        }
+
+        if (!commandManager)
+        {
+            Debug.LogError("PlayerController: CommandManager component not found!");
+        }
     }
 
     private void HandleMovementInputs()
     {
-        if(CurrentState == MovementState.Sprinting && _crouchFlag && !_playerMovement.IsSliding)
+        // Handle slide logic
+        if (CurrentState == MovementState.Sprinting && crouchFlag && !playerMovement.IsSliding)
         {
-            Debug.Log("Entro en el If de StartSlide");
-            _playerMovement.StartSlide();
+            Debug.Log("Starting slide from sprint + crouch");
+            playerMovement.StartSlide();
         }
-        if(!_crouchFlag && _playerMovement.IsSliding)
+
+        // Stop sliding when crouch is released
+        if (!crouchFlag && playerMovement.IsSliding)
         {
-            _playerMovement.StopSlide();
+            playerMovement.StopSlide();
         }
-        if (_jumpFlag)
+
+        // Handle jump
+        if (jumpFlag)
         {
-            _playerMovement.TryJump();
+            playerMovement.TryJump();
+            jumpFlag = false; // Reset jump flag after attempting
         }
-        if(_crouchFlag && !_sprintFlag && !_playerMovement.IsCrouching)
+
+        // Handle crouching (but not while sliding)
+        if (crouchFlag && !sprintFlag && !playerMovement.IsCrouching && !playerMovement.IsSliding)
         {
-            _playerMovement.Crouch();
+            playerMovement.Crouch();
         }
-        else
+        else if (!crouchFlag && !playerMovement.IsSliding)
         {
-            _playerMovement.UnCrouch();
+            playerMovement.UnCrouch();
         }
     }
 
     private void HandleMovementState()
     {
-        if (_sprintFlag)
+        // State priority: Sliding > Sprinting > Crouching > Air > Walking
+        if (playerMovement.IsSliding)
+        {
+            CurrentState = MovementState.Sliding; // Need to add this to enum
+        }
+        else if (sprintFlag && playerMovement.IsGrounded)
         {
             CurrentState = MovementState.Sprinting;
         }
-        else if (_crouchFlag)
+        else if (crouchFlag && playerMovement.IsGrounded)
         {
             CurrentState = MovementState.Crouching;
         }
-        else if (_playerMovement.IsGrounded)
-        {
-            CurrentState = MovementState.Walking;
-        }
-        else
+        else if (!playerMovement.IsGrounded)
         {
             CurrentState = MovementState.Air;
         }
-
+        else
+        {
+            CurrentState = MovementState.Walking;
+        }
     }
 
-
-
-    private void HandleInputs()
+    private void TryConsumeBufferedJump()
     {
-        _playerMovement.MoveInput = _inputManager.MoveInput;
-        _jumpFlag = _inputManager.JumpInput;
-        _sprintFlag = _inputManager.SprintInput;
-        _crouchFlag = _inputManager.CrouchInput;
-        
+        // Try to consume buffered jump input if we can jump now
+        if (playerMovement.IsGrounded && playerMovement.ReadyToJump && commandManager)
+        {
+            if (commandManager.ConsumeBufferedInput("Jump", 0.2f))
+            {
+                jumpFlag = true;
+            }
+        }
     }
 
     private void FixedUpdate()
     {
-        
-        if (_playerMovement.IsSliding)
+        // Handle movement in FixedUpdate for physics consistency
+        if (playerMovement.IsSliding)
         {
-            _playerMovement.SlidingMovement(_inputManager.MoveInput);
+            playerMovement.SlidingMovement(playerMovement.MoveInput);
         }
         else
         {
-            _playerMovement.Move(_inputManager.MoveInput);
+            playerMovement.Move(playerMovement.MoveInput);
         }
-        
-        
     }
 
-    internal void SetSprintInput(bool sprintState)
+    #region Public Input Methods (Called by Commands)
+
+    /// <summary>
+    /// Sets sprint input state - called by SprintCommand
+    /// </summary>
+    public void SetSprintInput(bool isPressed)
     {
-        throw new NotImplementedException();
+        sprintFlag = isPressed;
+
+        // Log state change for debugging
+        Debug.Log($"Sprint input: {(isPressed ? "Started" : "Stopped")}");
     }
 
-    internal void SetCrouchInput(bool crouchState)
+    /// <summary>
+    /// Sets crouch input state - called by CrouchCommand
+    /// </summary>
+    public void SetCrouchInput(bool isPressed)
     {
-        throw new NotImplementedException();
+        crouchFlag = isPressed;
+
+        // Log state change for debugging
+        Debug.Log($"Crouch input: {(isPressed ? "Started" : "Stopped")}");
     }
+
+    /// <summary>
+    /// Triggers jump - called by JumpCommand
+    /// </summary>
+    public void TriggerJump()
+    {
+        if (playerMovement.IsGrounded && playerMovement.ReadyToJump)
+        {
+            jumpFlag = true;
+            Debug.Log("Jump triggered");
+        }
+    }
+
+    #endregion
+
+    #region Public Utility Methods
+
+    /// <summary>
+    /// Execute a custom command through the player
+    /// </summary>
+    public void ExecuteCommand(ICommand command)
+    {
+        commandManager?.ExecuteCommand(command);
+    }
+
+    /// <summary>
+    /// Buffer a command for later execution
+    /// </summary>
+    public void BufferCommand(ICommand command)
+    {
+        commandManager?.BufferCommand(command);
+    }
+
+    /// <summary>
+    /// Get current movement speed for external systems
+    /// </summary>
+    public float GetCurrentSpeed()
+    {
+        if (playerMovement)
+        {
+            return playerMovement.GetComponent<Rigidbody>().linearVelocity.magnitude;
+        }
+        return 0f;
+    }
+
+    /// <summary>
+    /// Check if player can perform certain actions
+    /// </summary>
+    public bool CanSprint()
+    {
+        return playerMovement.IsGrounded && !playerMovement.IsCrouching && !playerMovement.IsSliding;
+    }
+
+    public bool CanCrouch()
+    {
+        return playerMovement.IsGrounded;
+    }
+
+    public bool CanSlide()
+    {
+        return sprintFlag && playerMovement.IsGrounded && !playerMovement.IsSliding;
+    }
+
+    #endregion
+
+    #region Event Handlers (Optional)
+
+    private void OnEnable()
+    {
+        // Subscribe to command manager events if needed
+        if (commandManager)
+        {
+            commandManager.OnCommandExecuted += OnCommandExecuted;
+        }
+    }
+
+    private void OnDisable()
+    {
+        // Unsubscribe from events
+        if (commandManager)
+        {
+            commandManager.OnCommandExecuted -= OnCommandExecuted;
+        }
+    }
+
+    private void OnCommandExecuted(ICommand command)
+    {
+        // React to specific commands if needed
+        switch (command.CommandName)
+        {
+            case "Jump":
+                // Could add screen shake, sound effects, etc.
+                break;
+            case "Sprint":
+                // Could add speed lines effect, etc.
+                break;
+        }
+    }
+
+    #endregion
 }
