@@ -102,4 +102,13 @@ public class PlayerController : MonoBehaviour
         
     }
 
+    internal void SetSprintInput(bool sprintState)
+    {
+        throw new NotImplementedException();
+    }
+
+    internal void SetCrouchInput(bool crouchState)
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Video;
 
@@ -9,6 +10,11 @@ public class FPSCameraController : MonoBehaviour
     [SerializeField] private Transform orientation;
     private float xRotation;
     private float yRotation;
+
+    internal void SetLookInput(Vector2 inputValue)
+    {
+        throw new NotImplementedException();
+    }
 
     void Start()
     {

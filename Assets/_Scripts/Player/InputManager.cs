@@ -3,86 +3,147 @@ using UnityEngine.InputSystem;
 
 public class InputManager : MonoBehaviour
 {
-    [Header("Flags")]
-    [SerializeField] private Vector2 _moveInput;
-    [SerializeField] private Vector2 _lookInput;
-    [SerializeField] private bool _jumpInput;
-    [SerializeField] private bool _crouchInput;
-    [SerializeField] private bool _sprintInput;
+    [Header("References")]
+    [SerializeField] private PlayerController playerController;
+    [SerializeField] private CommandManager commandManager;
 
-    #region Properties
-    private bool needNewJumpInput;
-    #endregion
+    [Header("Settings")]
+    [SerializeField] private bool enableInputBuffering = true;
+    [SerializeField] private float mouseSensitivity = 1.0f;
 
-    #region Getters and Setters
-    public Vector2 MoveInput {get => _moveInput; set => _moveInput = value;}
-    public Vector2 LookInput {get => _lookInput; set => _lookInput = value;}
-
-    public bool JumpInput {get => _jumpInput; set => _jumpInput = value; }
-    public bool CrouchInput {get => _crouchInput; set => _crouchInput = value; }
-    public bool SprintInput {get => _sprintInput; set => _sprintInput = value; }
-    #endregion
-
-    PlayerControls _playerControls;
+    private PlayerControls playerControls;
+    private Vector2 currentMoveInput;
+    private Vector2 currentLookInput;
 
     private void Awake()
-    { 
-        _playerControls = new PlayerControls();
+    {
+        // Get references
+        if (!playerController) playerController = GetComponent<PlayerController>();
+        if (!commandManager) commandManager = GetComponent<CommandManager>();
 
-        //Movement Bindings
-        _playerControls.Player.Movement.started += OnMove;
-        _playerControls.Player.Movement.performed += OnMove;
-        _playerControls.Player.Movement.canceled += OnMove;
-        //Look Bindings
-        _playerControls.Player.Look.started += OnLook;
-        _playerControls.Player.Look.performed += OnLook;
-        _playerControls.Player.Look.canceled += OnLook;
-        //Jump Bindings
-        _playerControls.Player.Jump.started += OnJump;
-        _playerControls.Player.Jump.performed += OnJump;
-        _playerControls.Player.Jump.canceled += OnJump;
-        //Crouch Bindings
-        _playerControls.Player.Crouch.started += OnCrouch;
-        _playerControls.Player.Crouch.performed += OnCrouch;
-        _playerControls.Player.Crouch.canceled += OnCrouch;
-        //Sprint Bindings
-        _playerControls.Player.Sprint.started += OnSprint;
-        _playerControls.Player.Sprint.performed += OnSprint;
-        _playerControls.Player.Sprint.canceled += OnSprint;
-
+        // Initialize input system
+        playerControls = new PlayerControls();
+        BindInputActions();
     }
 
     private void OnEnable()
     {
-        _playerControls.Enable();
+        playerControls?.Enable();
     }
 
     private void OnDisable()
-    { 
-        _playerControls.Disable();
+    {
+        playerControls?.Disable();
     }
 
-    private void OnMove(InputAction.CallbackContext context)
-    { 
-        _moveInput = context.ReadValue<Vector2>();
+    private void Update()
+    {
+        // Process continuous inputs (movement and look)
+        ProcessContinuousInputs();
+    }
+
+    private void BindInputActions()
+    {
+        // Movement bindings
+        playerControls.Player.Movement.started += OnMovement;
+        playerControls.Player.Movement.performed += OnMovement;
+        playerControls.Player.Movement.canceled += OnMovement;
+
+        // Look bindings
+        playerControls.Player.Look.started += OnLook;
+        playerControls.Player.Look.performed += OnLook;
+        playerControls.Player.Look.canceled += OnLook;
+
+        // Action bindings
+        playerControls.Player.Jump.started += OnJump;
+        playerControls.Player.Sprint.started += OnSprintStarted;
+        playerControls.Player.Sprint.canceled += OnSprintCanceled;
+        playerControls.Player.Crouch.started += OnCrouchStarted;
+        playerControls.Player.Crouch.canceled += OnCrouchCanceled;
+    }
+
+    private void ProcessContinuousInputs()
+    {
+        // Handle movement input
+        if (currentMoveInput != Vector2.zero)
+        {
+            var moveCommand = new MoveCommand(playerController, currentMoveInput);
+            commandManager.ExecuteCommand(moveCommand);
+        }
+
+        // Handle look input
+        if (currentLookInput != Vector2.zero)
+        {
+            var lookCommand = new LookCommand(playerController, currentLookInput * mouseSensitivity);
+            commandManager.ExecuteCommand(lookCommand);
+        }
+    }
+
+    // Input callback methods
+    private void OnMovement(InputAction.CallbackContext context)
+    {
+        currentMoveInput = context.ReadValue<Vector2>();
     }
 
     private void OnLook(InputAction.CallbackContext context)
-    { 
-        _lookInput = context.ReadValue<Vector2>();
+    {
+        currentLookInput = context.ReadValue<Vector2>();
     }
 
     private void OnJump(InputAction.CallbackContext context)
-    { 
-        _jumpInput = context.ReadValueAsButton();
-        needNewJumpInput = false;
-    }
-    private void OnCrouch(InputAction.CallbackContext context)
     {
-        _crouchInput = context.ReadValueAsButton();
+        if (context.started)
+        {
+            var jumpCommand = new JumpCommand(playerController);
+
+            if (enableInputBuffering)
+            {
+                commandManager.BufferCommand(jumpCommand);
+            }
+            else
+            {
+                commandManager.ExecuteCommand(jumpCommand);
+            }
+        }
     }
-    private void OnSprint(InputAction.CallbackContext context)
+
+    private void OnSprintStarted(InputAction.CallbackContext context)
     {
-        _sprintInput = context.ReadValueAsButton();
+        var sprintCommand = new SprintCommand(playerController, true);
+        commandManager.ExecuteCommand(sprintCommand);
+    }
+
+    private void OnSprintCanceled(InputAction.CallbackContext context)
+    {
+        var sprintCommand = new SprintCommand(playerController, false);
+        commandManager.ExecuteCommand(sprintCommand);
+    }
+
+    private void OnCrouchStarted(InputAction.CallbackContext context)
+    {
+        var crouchCommand = new CrouchCommand(playerController, true);
+        commandManager.ExecuteCommand(crouchCommand);
+    }
+
+    private void OnCrouchCanceled(InputAction.CallbackContext context)
+    {
+        var crouchCommand = new CrouchCommand(playerController, false);
+        commandManager.ExecuteCommand(crouchCommand);
+    }
+
+    /// <summary>
+    /// Public method to execute custom commands
+    /// </summary>
+    public void ExecuteCustomCommand(ICommand command)
+    {
+        commandManager.ExecuteCommand(command);
+    }
+
+    /// <summary>
+    /// Public method to buffer custom commands
+    /// </summary>
+    public void BufferCustomCommand(ICommand command)
+    {
+        commandManager.BufferCommand(command);
     }
 }
